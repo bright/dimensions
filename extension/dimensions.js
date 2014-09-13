@@ -13,7 +13,7 @@ function activate(tab){
 
   chrome.tabs.insertCSS({ file: 'tooltip.css' });
   chrome.tabs.executeScript({ file: 'tooltip.js' });
-  chrome.browserAction.setIcon({ 
+  chrome.browserAction.setIcon({
     tabId: tab.id,
     path: {
       19: "images/icon_active.png",
@@ -23,7 +23,7 @@ function activate(tab){
 }
 
 function deactivate(tab){
-  chrome.browserAction.setIcon({  
+  chrome.browserAction.setIcon({
     tabId: tab.id,
     path: {
       19: "images/icon.png",
@@ -53,6 +53,7 @@ var dimensions = {
   image: new Image(),
   threshold: 6,
   takingScreenshot: false,
+  tabSize: null,
 
   initialize: function(port, tab){
     this.tab = tab;
@@ -90,7 +91,7 @@ var dimensions = {
   //
   // measureDistances
   // ================
-  //  
+  //
   // measures the distances to the next boundary
   // around pageX and pageY.
   //
@@ -112,6 +113,9 @@ var dimensions = {
       left:   { x: -1, y:  0 }
     }
     var area = 0;
+
+    this.scaleXYByRatio(input, this.imageToTabSizeRatio());
+
     var lightness = this.getLightnessAt(input.x, input.y);
 
     for(var direction in distances){
@@ -132,7 +136,7 @@ var dimensions = {
           boundaryFound = true;
         }
       }
-      
+
       area += distances[direction];
     }
 
@@ -159,7 +163,7 @@ var dimensions = {
 
             if(Math.abs(currentLightness - lastLightness) < this.threshold){
               similarColorStreak++;
-              if(similarColorStreak === similarColorStreakThreshold){ 
+              if(similarColorStreak === similarColorStreakThreshold){
                 distances[direction] -= (similarColorStreakThreshold+1);
                 boundaryFound = true;
               }
@@ -177,10 +181,35 @@ var dimensions = {
     distances.x = input.x;
     distances.y = input.y;
 
+    distances = this.scaleToTabSize(distances);
+
     this.port.postMessage({
       type: 'distances',
       data: distances
     });
+  },
+
+  tabToImageSizeRatio: function(){
+    return this.tab.width/this.width;
+  },
+
+  imageToTabSizeRatio: function(){
+    return this.width/this.tab.width;
+  },
+
+  scaleXYByRatio: function(xy, ratio){
+    xy.x *= ratio;
+    xy.y *= ratio;
+  },
+
+  scaleToTabSize: function(distances){
+    var ratio = this.tabToImageSizeRatio();
+    this.scaleXYByRatio(distances, ratio);
+    distances.top *= ratio;
+    distances.left *= ratio;
+    distances.bottom *= ratio;
+    distances.right *= ratio;
+    return distances;
   },
 
   getLightnessAt: function(x, y){
@@ -190,7 +219,7 @@ var dimensions = {
   //
   // inBoundaries
   // ============
-  //  
+  //
   // checks if x and y are in the canvas boundaries
   //
 
@@ -204,7 +233,7 @@ var dimensions = {
   //
   // Grayscale
   // ---------
-  //  
+  //
   // reduces the input image data to an array of gray shades.
   //
 
@@ -226,7 +255,7 @@ var dimensions = {
   //
   // loadImage
   // ---------
-  //  
+  //
   // responsible to load a image and extract the image data
   //
 
@@ -237,16 +266,16 @@ var dimensions = {
     // adjust the canvas size to the image size
     this.width = canvas.width = this.image.width;
     this.height = canvas.height = this.image.height;
-    
+
     // draw the image to the canvas
     ctx.drawImage(this.image, 0, 0);
-    
+
     // read out the image data from the canvas
     var imgData = ctx.getImageData(0, 0, this.width, this.height).data;
 
     // delete old grayscale data
     this.data = [];
-    
+
     // grayscale the image data
     this.data = this.grayscale( imgData );
 
